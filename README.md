@@ -2,10 +2,13 @@
 
 Do-It is a local-first task graph for a personal homelab. It runs one Go server on a device inside your Wi-Fi network, then every laptop or phone on that network opens the same browser UI.
 
-The product goal is simple: tasks, notes, files, and images stay synced across local devices without needing a cloud account. The UI is intentionally quiet: monochrome, translucent, no decorative noise, and task relationships shown as a connected mind map instead of a flat list.
+The product goal is simple: tasks, notes, files, and images stay synced across local devices without needing a cloud account. The UI is intentionally quiet: monochrome, translucent, no stupid decorative noise, and connected mind map instead of boring flat list.
 
-## What Works Now
+<img width="1449" height="875" alt="Screenshot of my homelab on Vivo Phone" src="https://github.com/user-attachments/assets/be59e0f7-30ea-49b8-892f-37f157ca7ee3" />
+<b>Screenshot of my homelab on Vivo Phone<b>
 
+
+## What it does
 - Go HTTP server with embedded static frontend.
 - Task graph with parent-child connections.
 - Live sync across open browsers using Server-Sent Events.
@@ -62,7 +65,7 @@ For an always-on phone or mini server, put `DOIT_DATA_DIR` somewhere backed up a
 
 Recommended always-on hosts:
 
-- Old Android phone running Termux.
+- Old Android phone running Termux(which I did on Vivo).
 - Raspberry Pi.
 - Mini PC.
 - NAS or small Linux box.
