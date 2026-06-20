@@ -5,7 +5,7 @@ Do-It is a local-first task graph for a personal homelab. It runs one Go server 
 The product goal is simple: tasks, notes, files, and images stay synced across local devices without needing a cloud account. The UI is intentionally quiet: monochrome, translucent, no stupid decorative noise, and connected mind map instead of boring flat list.
 
 <img width="1449" height="875" alt="Screenshot of my homelab on Vivo Phone" src="https://github.com/user-attachments/assets/be59e0f7-30ea-49b8-892f-37f157ca7ee3" />
-<b>Screenshot of my homelab on Vivo Phone<b>
+<b>Screenshot of my homelab on Vivo Phone</b>
 
 
 ## What it does
