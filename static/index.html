@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Do-It</title>
+    <link rel="stylesheet" href="/app.css">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="rail" aria-label="Create task">
+        <header class="brand">
+          <h1>Do-It</h1>
+          <p id="connection">connecting</p>
+        </header>
+
+        <form id="task-form" class="composer">
+          <label>
+            <span>Task</span>
+            <input id="title" name="title" autocomplete="off" maxlength="120" required>
+          </label>
+
+          <label>
+            <span>Parent task</span>
+            <select id="parentId" name="parentId">
+              <option value="">Root</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Notes</span>
+            <textarea id="notes" name="notes" rows="5" maxlength="2000"></textarea>
+          </label>
+
+          <label>
+            <span>Files</span>
+            <input id="files" name="files" type="file" multiple>
+          </label>
+
+          <div class="actions">
+            <button type="submit" class="primary" title="Add task">add</button>
+            <button type="reset" title="Clear form">clear</button>
+          </div>
+        </form>
+
+        <div class="network">
+          <p>LAN</p>
+          <div id="lan-urls"></div>
+        </div>
+
+        <div class="devices-panel">
+          <div class="section-heading">
+            <p>Devices</p>
+            <span id="device-count">0 online</span>
+          </div>
+          <div id="devices"></div>
+        </div>
+      </section>
+
+      <section class="map" aria-label="Task map">
+        <canvas id="edges" aria-hidden="true"></canvas>
+        <div id="nodes"></div>
+      </section>
+
+      <aside class="inspector" aria-label="Task details">
+        <div id="details"></div>
+      </aside>
+    </main>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>

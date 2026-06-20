@@ -1,29 +1,56 @@
 package main
 
 import (
-	"fmt"
+	"embed"
+	"io/fs"
+	"log"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 )
 
-var shortgo = "watch go crash course"
-var lonGo = "watch nana's golang full course"
-var reward = "monster energy drnik"
-var taskItems = []string{shortgo, reward, lonGo}
+//go:embed static/*
+var staticFiles embed.FS
 
 func main() {
-	fmt.Println("##### Welcome to our ToDolist App####")
-	http.HandleFunc("/", hell)
-	http.HandleFunc("/show-tasks", showTasks)
-	http.ListenAndServe(":8080", nil)
+	addr := env("DOIT_ADDR", ":8080")
+	dataDir := env("DOIT_DATA_DIR", "data")
+	statePath := filepath.Join(dataDir, "state.json")
+	uploadDir := filepath.Join(dataDir, "uploads")
 
-}
-
-func hell(writer http.ResponseWriter, request *http.Request) {
-	var greeting = "Hello, User\n Welcome to our ToDolist App"
-	fmt.Fprintln(writer, greeting)
-}
-func showTasks(writer http.ResponseWriter, request *http.Request) {
-	for _, x := range taskItems {
-		fmt.Fprintln(writer, x)
+	store, err := NewStore(statePath)
+	if err != nil {
+		log.Fatalf("load store: %v", err)
 	}
+
+	staticRoot, err := fs.Sub(staticFiles, "static")
+	if err != nil {
+		log.Fatalf("load static files: %v", err)
+	}
+
+	app := newApp(store, uploadDir, http.FileServer(http.FS(staticRoot)))
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           app.routes(),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	log.Printf("Do-It listening on http://localhost:%s", listenPort(addr))
+	for _, url := range localNetworkURLs(listenPort(addr)) {
+		log.Printf("LAN device URL: %s", url)
+	}
+
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("serve: %v", err)
+	}
+}
+
+func env(key, fallback string) string {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	return value
 }
