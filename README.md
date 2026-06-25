@@ -61,6 +61,11 @@ DOIT_DATA_DIR=/path/to/doit-data go run .
 
 For an always-on phone or mini server, put `DOIT_DATA_DIR` somewhere backed up and large enough for uploads.
 
+## Data Flow Diagram (my type of)
+<img width="10566" height="8499" alt="Untitled-2026-04-22-2336 excalidraw" src="https://github.com/user-attachments/assets/351f53a4-3847-4f03-872e-6da1cfacc946" />
+
+
+
 ## Homelab Shape
 
 Recommended always-on hosts:
