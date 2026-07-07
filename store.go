@@ -383,8 +383,9 @@ func validateTaskText(title, notes string) error {
 func tooLong(value string, max int) bool {
 	units := 0
 	for _, r := range value {
-		units++
-		if r > 0xffff {
+		if r > 0xFFFF {
+			units += 2
+		} else {
 			units++
 		}
 		if units > max {

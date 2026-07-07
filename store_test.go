@@ -145,7 +145,7 @@ func TestStoreEnforcesTaskTextLimits(t *testing.T) {
 	}
 }
 
-func TestStoreTaskTextLimitsMatchUTF16MaxLength(t *testing.T) {
+func TestStoreTextLimitsMatchBrowserUTF16Counting(t *testing.T) {
 	store, err := NewStore(filepath.Join(t.TempDir(), "state.json"))
 	if err != nil {
 		t.Fatalf("new store: %v", err)
