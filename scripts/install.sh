@@ -44,6 +44,21 @@ download() {
   exit 1
 }
 
+download_optional() {
+  url="$1"
+  output="$2"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$url" -o "$output" >/dev/null 2>&1 && return 0
+    return 1
+  fi
+  if command -v wget >/dev/null 2>&1; then
+    wget -qO "$output" "$url" >/dev/null 2>&1 && return 0
+    return 1
+  fi
+  echo "curl or wget is required" >&2
+  exit 1
+}
+
 verify_checksum() {
   archive_path="$1"
   checksums_path="$2"
@@ -70,8 +85,11 @@ verify_checksum() {
 }
 
 download "$base_url/$archive" "$tmp_dir/$archive"
-download "$base_url/checksums.txt" "$tmp_dir/checksums.txt"
-verify_checksum "$tmp_dir/$archive" "$tmp_dir/checksums.txt"
+if download_optional "$base_url/checksums.txt" "$tmp_dir/checksums.txt"; then
+  verify_checksum "$tmp_dir/$archive" "$tmp_dir/checksums.txt"
+else
+  echo "checksums.txt not found for this release; installing without checksum verification" >&2
+fi
 tar -xzf "$tmp_dir/$archive" -C "$tmp_dir"
 
 mkdir -p "$install_dir"
