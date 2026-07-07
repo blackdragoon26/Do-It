@@ -19,6 +19,11 @@ var (
 	errNotFound = errors.New("not found")
 )
 
+const (
+	maxTitleLength = 120
+	maxNotesLength = 2000
+)
+
 type Attachment struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
@@ -117,6 +122,9 @@ func (s *Store) AddTask(title, notes, parentID string, attachments []Attachment)
 	if title == "" {
 		return Snapshot{}, Task{}, fmt.Errorf("%w: title is required", errBadInput)
 	}
+	if err := validateTaskText(title, notes); err != nil {
+		return Snapshot{}, Task{}, err
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -170,10 +178,17 @@ func (s *Store) PatchTask(id string, patch TaskPatch) (Snapshot, Task, error) {
 		if title == "" {
 			return Snapshot{}, Task{}, fmt.Errorf("%w: title is required", errBadInput)
 		}
+		if tooLong(title, maxTitleLength) {
+			return Snapshot{}, Task{}, fmt.Errorf("%w: title must be at most %d characters", errBadInput, maxTitleLength)
+		}
 		task.Title = title
 	}
 	if patch.Notes != nil {
-		task.Notes = strings.TrimSpace(*patch.Notes)
+		notes := strings.TrimSpace(*patch.Notes)
+		if tooLong(notes, maxNotesLength) {
+			return Snapshot{}, Task{}, fmt.Errorf("%w: notes must be at most %d characters", errBadInput, maxNotesLength)
+		}
+		task.Notes = notes
 	}
 	if patch.Done != nil {
 		task.Done = *patch.Done
@@ -351,6 +366,30 @@ func (s *Store) wouldCycleLocked(id, parentID string) bool {
 			return false
 		}
 		parentID = parent.ParentID
+	}
+	return false
+}
+
+func validateTaskText(title, notes string) error {
+	if tooLong(title, maxTitleLength) {
+		return fmt.Errorf("%w: title must be at most %d characters", errBadInput, maxTitleLength)
+	}
+	if tooLong(notes, maxNotesLength) {
+		return fmt.Errorf("%w: notes must be at most %d characters", errBadInput, maxNotesLength)
+	}
+	return nil
+}
+
+func tooLong(value string, max int) bool {
+	units := 0
+	for _, r := range value {
+		units++
+		if r > 0xffff {
+			units++
+		}
+		if units > max {
+			return true
+		}
 	}
 	return false
 }

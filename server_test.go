@@ -446,6 +446,19 @@ func TestEventHubTracksClientHealth(t *testing.T) {
 	}
 }
 
+func TestVirtualInterfaceNamesAreSkippedForLANURLs(t *testing.T) {
+	for _, name := range []string{"docker0", "br-1a2b3c", "veth123", "virbr0"} {
+		if !isLikelyVirtualInterface(name) {
+			t.Fatalf("expected %q to be treated as virtual", name)
+		}
+	}
+	for _, name := range []string{"en0", "wlan0", "eth0"} {
+		if isLikelyVirtualInterface(name) {
+			t.Fatalf("expected %q to be treated as a physical candidate", name)
+		}
+	}
+}
+
 func createUploadedTask(t *testing.T, app *app, name, contents string) Task {
 	t.Helper()
 
