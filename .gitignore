@@ -1,2 +1,4 @@
 data/
 awesomeProject
+.gocache
+.vercel
