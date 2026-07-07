@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"mime"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -20,9 +20,11 @@ import (
 )
 
 const (
-	maxRequestBytes = 64 << 20
-	maxUploadBytes  = 32 << 20
-	maxFilesPerTask = 8
+	maxRequestBytes       = 64 << 20
+	maxUploadBytes        = 32 << 20
+	maxFilesPerTask       = 8
+	maxMutationsPerMinute = 60
+	maxRateLimitClients   = 4096
 )
 
 type app struct {
@@ -30,6 +32,7 @@ type app struct {
 	hub       *eventHub
 	uploadDir string
 	static    http.Handler
+	limiter   *rateLimiter
 }
 
 type eventHub struct {
@@ -53,6 +56,18 @@ type clientSession struct {
 type serverEvent struct {
 	Name string
 	Data []byte
+}
+
+type rateLimiter struct {
+	mu      sync.Mutex
+	window  time.Duration
+	limit   int
+	clients map[string]rateWindow
+}
+
+type rateWindow struct {
+	start time.Time
+	count int
 }
 
 type ConnectedDevice struct {
@@ -87,11 +102,20 @@ func newApp(store *Store, uploadDir string, static http.Handler) *app {
 		hub:       newEventHub(),
 		uploadDir: uploadDir,
 		static:    static,
+		limiter:   newRateLimiter(time.Minute, maxMutationsPerMinute),
 	}
 }
 
 func newEventHub() *eventHub {
 	return &eventHub{clients: make(map[string]*clientSession)}
+}
+
+func newRateLimiter(window time.Duration, limit int) *rateLimiter {
+	return &rateLimiter{
+		window:  window,
+		limit:   limit,
+		clients: make(map[string]rateWindow),
+	}
 }
 
 func (a *app) routes() http.Handler {
@@ -104,7 +128,7 @@ func (a *app) routes() http.Handler {
 	mux.HandleFunc("/api/network", a.handleNetwork)
 	mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(a.uploadDir))))
 	mux.Handle("/", a.static)
-	return withSecurityHeaders(mux)
+	return withSecurityHeaders(a.withMutationRateLimit(mux))
 }
 
 func (a *app) handleTasks(w http.ResponseWriter, r *http.Request) {
@@ -188,11 +212,17 @@ func (a *app) handleTaskByID(w http.ResponseWriter, r *http.Request) {
 		a.hub.broadcast(snapshot)
 		writeJSON(w, http.StatusOK, task)
 	case http.MethodDelete:
+		task, err := a.store.Task(id)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
 		snapshot, err := a.store.DeleteTask(id)
 		if err != nil {
 			writeStoreError(w, err)
 			return
 		}
+		a.removeUploadedAttachments(task.Attachments)
 		a.hub.broadcast(snapshot)
 		w.WriteHeader(http.StatusNoContent)
 	default:
@@ -341,50 +371,56 @@ func (a *app) saveUploadedFiles(r *http.Request) ([]Attachment, error) {
 	}
 
 	attachments := make([]Attachment, 0, len(files))
+	createdPaths := make([]string, 0, len(files))
+	fail := func(err error) ([]Attachment, error) {
+		removeUploadedPaths(createdPaths)
+		return nil, err
+	}
 	for _, header := range files {
 		if header.Size > maxUploadBytes {
-			return nil, fmt.Errorf("%s is larger than %s", header.Filename, humanBytes(maxUploadBytes))
+			return fail(fmt.Errorf("%s is larger than %s", header.Filename, humanBytes(maxUploadBytes)))
 		}
 
 		source, err := header.Open()
 		if err != nil {
-			return nil, err
+			return fail(err)
 		}
 
 		fileID, err := newID("file")
 		if err != nil {
 			_ = source.Close()
-			return nil, err
+			return fail(err)
 		}
 		name := sanitizeFilename(header.Filename)
 		if name == "" {
 			name = fileID
+		}
+		contentType, err := allowedUploadType(name)
+		if err != nil {
+			_ = source.Close()
+			return fail(err)
 		}
 		storedName := fileID + "_" + name
 		targetPath := filepath.Join(a.uploadDir, storedName)
 		target, err := os.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 		if err != nil {
 			_ = source.Close()
-			return nil, err
+			return fail(err)
 		}
+		createdPaths = append(createdPaths, targetPath)
 
 		written, copyErr := io.Copy(target, io.LimitReader(source, maxUploadBytes+1))
 		closeErr := errors.Join(source.Close(), target.Close())
 		if copyErr != nil {
-			return nil, copyErr
+			return fail(copyErr)
 		}
 		if closeErr != nil {
-			return nil, closeErr
+			return fail(closeErr)
 		}
 		if written > maxUploadBytes {
-			_ = os.Remove(targetPath)
-			return nil, fmt.Errorf("%s is larger than %s", header.Filename, humanBytes(maxUploadBytes))
+			return fail(fmt.Errorf("%s is larger than %s", header.Filename, humanBytes(maxUploadBytes)))
 		}
 
-		contentType := header.Header.Get("Content-Type")
-		if contentType == "" {
-			contentType = mime.TypeByExtension(filepath.Ext(name))
-		}
 		attachments = append(attachments, Attachment{
 			ID:        fileID,
 			Name:      name,
@@ -395,6 +431,24 @@ func (a *app) saveUploadedFiles(r *http.Request) ([]Attachment, error) {
 		})
 	}
 	return attachments, nil
+}
+
+func (a *app) removeUploadedAttachments(attachments []Attachment) {
+	for _, attachment := range attachments {
+		storedName := filepath.Base(strings.TrimPrefix(attachment.URL, "/uploads/"))
+		if storedName == "." || storedName == string(filepath.Separator) || storedName == "" {
+			continue
+		}
+		removeUploadedPaths([]string{filepath.Join(a.uploadDir, storedName)})
+	}
+}
+
+func removeUploadedPaths(paths []string) {
+	for _, path := range paths {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			log.Printf("remove upload %s: %v", path, err)
+		}
+	}
 }
 
 func (h *eventHub) subscribe(r *http.Request) (*clientSession, error) {
@@ -567,12 +621,62 @@ func methodNotAllowed(w http.ResponseWriter, methods ...string) {
 	httpError(w, http.StatusMethodNotAllowed, "method not allowed")
 }
 
+func (a *app) withMutationRateLimit(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if isMutation(r) && !a.limiter.Allow(remoteAddress(r)) {
+			httpError(w, http.StatusTooManyRequests, "too many requests")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func isMutation(r *http.Request) bool {
+	switch r.Method {
+	case http.MethodPost, http.MethodPatch, http.MethodDelete, http.MethodPut:
+		return strings.HasPrefix(r.URL.Path, "/api/")
+	default:
+		return false
+	}
+}
+
 func withSecurityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "same-origin")
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (l *rateLimiter) Allow(key string) bool {
+	if key == "" {
+		key = "unknown"
+	}
+	now := time.Now().UTC()
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	for client, window := range l.clients {
+		if now.Sub(window.start) >= l.window {
+			delete(l.clients, client)
+		}
+	}
+
+	window := l.clients[key]
+	if window.start.IsZero() || now.Sub(window.start) >= l.window {
+		if len(l.clients) >= maxRateLimitClients {
+			return false
+		}
+		l.clients[key] = rateWindow{start: now, count: 1}
+		return true
+	}
+	if window.count >= l.limit {
+		return false
+	}
+	window.count++
+	l.clients[key] = window
+	return true
 }
 
 func sanitizeFilename(name string) string {
@@ -594,6 +698,29 @@ func sanitizeFilename(name string) string {
 		}
 	}
 	return strings.Trim(builder.String(), ".-_")
+}
+
+func allowedUploadType(name string) (string, error) {
+	ext := strings.ToLower(filepath.Ext(name))
+	allowed := map[string]string{
+		".csv":  "text/csv; charset=utf-8",
+		".gif":  "image/gif",
+		".jpeg": "image/jpeg",
+		".jpg":  "image/jpeg",
+		".json": "application/json",
+		".md":   "text/markdown; charset=utf-8",
+		".pdf":  "application/pdf",
+		".png":  "image/png",
+		".txt":  "text/plain; charset=utf-8",
+		".webp": "image/webp",
+	}
+	if contentType, ok := allowed[ext]; ok {
+		return contentType, nil
+	}
+	if ext == "" {
+		return "", fmt.Errorf("file extension is required")
+	}
+	return "", fmt.Errorf("%s uploads are not allowed", ext)
 }
 
 func humanBytes(n int64) string {

@@ -91,6 +91,25 @@ func (s *Store) Snapshot() Snapshot {
 	return s.snapshotLocked()
 }
 
+func (s *Store) Task(id string) (Task, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return Task{}, fmt.Errorf("%w: id is required", errBadInput)
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	task, ok := s.tasks[id]
+	if !ok {
+		return Task{}, errNotFound
+	}
+	if len(task.Attachments) > 0 {
+		task.Attachments = append([]Attachment(nil), task.Attachments...)
+	}
+	return task, nil
+}
+
 func (s *Store) AddTask(title, notes, parentID string, attachments []Attachment) (Snapshot, Task, error) {
 	title = strings.TrimSpace(title)
 	notes = strings.TrimSpace(notes)
