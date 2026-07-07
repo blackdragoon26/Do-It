@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -113,6 +114,65 @@ func TestCreateTaskRejectsExecutableUploadExtension(t *testing.T) {
 	}
 }
 
+func TestCreateTaskCleansEarlierUploadsWhenLaterFileFails(t *testing.T) {
+	dataDir := t.TempDir()
+	uploadDir := filepath.Join(dataDir, "uploads")
+	store, err := NewStore(filepath.Join(dataDir, "state.json"))
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	app := newApp(store, uploadDir, http.NotFoundHandler())
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("title", "Mixed upload"); err != nil {
+		t.Fatalf("write title: %v", err)
+	}
+	first, err := writer.CreateFormFile("files", "safe.txt")
+	if err != nil {
+		t.Fatalf("create first file: %v", err)
+	}
+	if _, err := first.Write([]byte("safe")); err != nil {
+		t.Fatalf("write first file: %v", err)
+	}
+	second, err := writer.CreateFormFile("files", "unsafe.sh")
+	if err != nil {
+		t.Fatalf("create second file: %v", err)
+	}
+	if _, err := second.Write([]byte("echo unsafe")); err != nil {
+		t.Fatalf("write second file: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart writer: %v", err)
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/api/tasks", &body)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	response := httptest.NewRecorder()
+	app.routes().ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", response.Code, response.Body.String())
+	}
+	entries, err := os.ReadDir(uploadDir)
+	if err != nil && !os.IsNotExist(err) {
+		t.Fatalf("read upload dir: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("expected failed multi-file upload to remove earlier files, got %d", len(entries))
+	}
+}
+
+func TestAllowedUploadTypeReportsUnknownExtension(t *testing.T) {
+	_, err := allowedUploadType("script.sh")
+	if err == nil {
+		t.Fatal("expected .sh to be rejected")
+	}
+	if !strings.Contains(err.Error(), ".sh uploads are not allowed") {
+		t.Fatalf("expected unknown extension message, got %q", err.Error())
+	}
+}
+
 func TestDeleteTaskRemovesUploadedFiles(t *testing.T) {
 	dataDir := t.TempDir()
 	uploadDir := filepath.Join(dataDir, "uploads")
@@ -166,6 +226,33 @@ func TestMutationRateLimit(t *testing.T) {
 		if response.Code != want {
 			t.Fatalf("request %d: expected status %d, got %d: %s", i+1, want, response.Code, response.Body.String())
 		}
+	}
+}
+
+func TestMutationRateLimitPrunesExpiredClients(t *testing.T) {
+	limiter := newRateLimiter(time.Minute, 1)
+	limiter.clients["expired"] = rateWindow{
+		start: time.Now().Add(-2 * time.Minute),
+		count: 1,
+	}
+
+	if !limiter.Allow("fresh") {
+		t.Fatal("expected fresh client to be allowed")
+	}
+	if _, ok := limiter.clients["expired"]; ok {
+		t.Fatal("expected expired client to be pruned")
+	}
+}
+
+func TestMutationRateLimitCapsClientMap(t *testing.T) {
+	limiter := newRateLimiter(time.Minute, 1)
+	now := time.Now()
+	for i := 0; i < maxRateLimitClients; i++ {
+		limiter.clients[fmt.Sprintf("client-%d", i)] = rateWindow{start: now, count: 1}
+	}
+
+	if limiter.Allow("overflow") {
+		t.Fatal("expected new client to be rejected when limiter map is full")
 	}
 }
 
