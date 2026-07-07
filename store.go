@@ -104,6 +104,9 @@ func (s *Store) Task(id string) (Task, error) {
 	if !ok {
 		return Task{}, errNotFound
 	}
+	if len(task.Attachments) > 0 {
+		task.Attachments = append([]Attachment(nil), task.Attachments...)
+	}
 	return task, nil
 }
 
