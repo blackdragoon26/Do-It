@@ -82,7 +82,8 @@ nav {
 
 nav a,
 .site-footer a,
-.button {
+.button,
+.command button {
   transition: color 160ms ease, border-color 160ms ease, background 160ms ease, transform 160ms ease;
 }
 
@@ -239,6 +240,14 @@ h1 {
   align-items: start;
 }
 
+.install-note {
+  max-width: 520px;
+  margin: 20px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
 h2 {
   max-width: 520px;
   margin: 0;
@@ -252,15 +261,23 @@ h2 {
   gap: 10px;
 }
 
+.command {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-strong);
+  overflow: hidden;
+}
+
 pre {
   margin: 0;
   padding: 16px;
   overflow: auto;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel-strong);
+  background: transparent;
 }
 
 code {
@@ -270,6 +287,24 @@ code {
   line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.command button {
+  min-width: 68px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+
+.command button:hover,
+.command button:focus-visible {
+  color: var(--ink);
+  outline: none;
+  background: var(--panel);
 }
 
 .site-footer {
@@ -351,6 +386,16 @@ code {
 
   .button {
     width: 100%;
+  }
+
+  .command {
+    grid-template-columns: 1fr;
+  }
+
+  .command button {
+    min-height: 38px;
+    border-left: 0;
+    border-top: 1px solid var(--line);
   }
 
   .site-footer {
