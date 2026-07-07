@@ -143,7 +143,7 @@ func TestCreateTaskRejectsMissingCSRFToken(t *testing.T) {
 	}
 }
 
-func TestUnsupportedAPIMethodReturnsMethodNotAllowedWithoutCSRF(t *testing.T) {
+func TestUnsupportedAPIMethodRequiresCSRFBeforeMethodCheck(t *testing.T) {
 	dataDir := t.TempDir()
 	store, err := NewStore(filepath.Join(dataDir, "state.json"))
 	if err != nil {
@@ -153,6 +153,15 @@ func TestUnsupportedAPIMethodReturnsMethodNotAllowedWithoutCSRF(t *testing.T) {
 
 	request := httptest.NewRequest(http.MethodPut, "/api/tasks", nil)
 	response := httptest.NewRecorder()
+	app.routes().ServeHTTP(response, request)
+
+	if response.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d: %s", response.Code, response.Body.String())
+	}
+
+	request = httptest.NewRequest(http.MethodPut, "/api/tasks", nil)
+	addCSRF(request)
+	response = httptest.NewRecorder()
 	app.routes().ServeHTTP(response, request)
 
 	if response.Code != http.StatusMethodNotAllowed {

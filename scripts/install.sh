@@ -44,7 +44,34 @@ download() {
   exit 1
 }
 
+verify_checksum() {
+  archive_path="$1"
+  checksums_path="$2"
+  archive_name="$(basename "$archive_path")"
+  expected="$(awk -v name="$archive_name" '$2 == name { print $1; found = 1 } END { if (!found) exit 1 }' "$checksums_path")" || {
+    echo "checksum for $archive_name not found" >&2
+    exit 1
+  }
+
+  if command -v sha256sum >/dev/null 2>&1; then
+    printf '%s  %s\n' "$expected" "$archive_path" | sha256sum -c -
+    return
+  fi
+  if command -v shasum >/dev/null 2>&1; then
+    actual="$(shasum -a 256 "$archive_path" | awk '{ print $1 }')"
+    if [ "$actual" = "$expected" ]; then
+      return
+    fi
+    echo "$archive_name checksum mismatch" >&2
+    exit 1
+  fi
+  echo "sha256sum or shasum is required to verify downloads" >&2
+  exit 1
+}
+
 download "$base_url/$archive" "$tmp_dir/$archive"
+download "$base_url/checksums.txt" "$tmp_dir/checksums.txt"
+verify_checksum "$tmp_dir/$archive" "$tmp_dir/checksums.txt"
 tar -xzf "$tmp_dir/$archive" -C "$tmp_dir"
 
 mkdir -p "$install_dir"
