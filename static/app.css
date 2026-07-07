@@ -162,6 +162,27 @@ label span,
   margin-top: 26px;
 }
 
+.credit {
+  margin-top: 28px;
+  padding-top: 14px;
+  border-top: 1px solid var(--faint);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.credit a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.credit a:hover,
+.credit a:focus-visible {
+  text-decoration: underline;
+}
+
 .section-heading {
   display: flex;
   align-items: center;
