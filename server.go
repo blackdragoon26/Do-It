@@ -856,6 +856,9 @@ func localNetworkURLs(port string) []string {
 		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
 			continue
 		}
+		if isLikelyVirtualInterface(iface.Name) {
+			continue
+		}
 		addrs, err := iface.Addrs()
 		if err != nil {
 			continue
@@ -870,6 +873,17 @@ func localNetworkURLs(port string) []string {
 	}
 	sort.Strings(urls)
 	return urls
+}
+
+func isLikelyVirtualInterface(name string) bool {
+	name = strings.ToLower(strings.TrimSpace(name))
+	prefixes := []string{"br-", "docker", "veth", "virbr"}
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func remoteAddress(r *http.Request) string {

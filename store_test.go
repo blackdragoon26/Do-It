@@ -2,6 +2,7 @@ package main
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -120,5 +121,43 @@ func TestStoreSortsTasksWithIDTieBreaker(t *testing.T) {
 	}
 	if tasks[0].ID != "task_a" || tasks[1].ID != "task_b" {
 		t.Fatalf("expected ID tie-breaker order, got %q then %q", tasks[0].ID, tasks[1].ID)
+	}
+}
+
+func TestStoreEnforcesTaskTextLimits(t *testing.T) {
+	store, err := NewStore(filepath.Join(t.TempDir(), "state.json"))
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+
+	longTitle := strings.Repeat("t", maxTitleLength+1)
+	if _, _, err := store.AddTask(longTitle, "", "", nil); err == nil {
+		t.Fatal("expected long title to be rejected")
+	}
+
+	_, task, err := store.AddTask("Within limit", "", "", nil)
+	if err != nil {
+		t.Fatalf("add task: %v", err)
+	}
+	longNotes := strings.Repeat("n", maxNotesLength+1)
+	if _, _, err := store.PatchTask(task.ID, TaskPatch{Notes: &longNotes}); err == nil {
+		t.Fatal("expected long notes to be rejected")
+	}
+}
+
+func TestStoreTextLimitsMatchBrowserUTF16Counting(t *testing.T) {
+	store, err := NewStore(filepath.Join(t.TempDir(), "state.json"))
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+
+	withinLimit := strings.Repeat("a", maxTitleLength-2) + "😀"
+	if _, _, err := store.AddTask(withinLimit, "", "", nil); err != nil {
+		t.Fatalf("expected UTF-16 limit boundary to be accepted: %v", err)
+	}
+
+	overLimit := strings.Repeat("a", maxTitleLength-1) + "😀"
+	if _, _, err := store.AddTask(overLimit, "", "", nil); err == nil {
+		t.Fatal("expected title beyond UTF-16 limit to be rejected")
 	}
 }
