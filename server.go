@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"net"
 	"net/http"
@@ -24,6 +25,7 @@ const (
 	maxUploadBytes        = 32 << 20
 	maxFilesPerTask       = 8
 	maxMutationsPerMinute = 60
+	maxRateLimitClients   = 4096
 )
 
 type app struct {
@@ -370,20 +372,25 @@ func (a *app) saveUploadedFiles(r *http.Request) ([]Attachment, error) {
 	}
 
 	attachments := make([]Attachment, 0, len(files))
+	createdPaths := make([]string, 0, len(files))
+	fail := func(err error) ([]Attachment, error) {
+		removeUploadedPaths(createdPaths)
+		return nil, err
+	}
 	for _, header := range files {
 		if header.Size > maxUploadBytes {
-			return nil, fmt.Errorf("%s is larger than %s", header.Filename, humanBytes(maxUploadBytes))
+			return fail(fmt.Errorf("%s is larger than %s", header.Filename, humanBytes(maxUploadBytes)))
 		}
 
 		source, err := header.Open()
 		if err != nil {
-			return nil, err
+			return fail(err)
 		}
 
 		fileID, err := newID("file")
 		if err != nil {
 			_ = source.Close()
-			return nil, err
+			return fail(err)
 		}
 		name := sanitizeFilename(header.Filename)
 		if name == "" {
@@ -392,27 +399,27 @@ func (a *app) saveUploadedFiles(r *http.Request) ([]Attachment, error) {
 		contentType, err := allowedUploadType(name)
 		if err != nil {
 			_ = source.Close()
-			return nil, err
+			return fail(err)
 		}
 		storedName := fileID + "_" + name
 		targetPath := filepath.Join(a.uploadDir, storedName)
 		target, err := os.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 		if err != nil {
 			_ = source.Close()
-			return nil, err
+			return fail(err)
 		}
+		createdPaths = append(createdPaths, targetPath)
 
 		written, copyErr := io.Copy(target, io.LimitReader(source, maxUploadBytes+1))
 		closeErr := errors.Join(source.Close(), target.Close())
 		if copyErr != nil {
-			return nil, copyErr
+			return fail(copyErr)
 		}
 		if closeErr != nil {
-			return nil, closeErr
+			return fail(closeErr)
 		}
 		if written > maxUploadBytes {
-			_ = os.Remove(targetPath)
-			return nil, fmt.Errorf("%s is larger than %s", header.Filename, humanBytes(maxUploadBytes))
+			return fail(fmt.Errorf("%s is larger than %s", header.Filename, humanBytes(maxUploadBytes)))
 		}
 
 		attachments = append(attachments, Attachment{
@@ -433,7 +440,15 @@ func (a *app) removeUploadedAttachments(attachments []Attachment) {
 		if storedName == "." || storedName == string(filepath.Separator) || storedName == "" {
 			continue
 		}
-		_ = os.Remove(filepath.Join(a.uploadDir, storedName))
+		removeUploadedPaths([]string{filepath.Join(a.uploadDir, storedName)})
+	}
+}
+
+func removeUploadedPaths(paths []string) {
+	for _, path := range paths {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			log.Printf("remove upload %s: %v", path, err)
+		}
 	}
 }
 
@@ -643,8 +658,17 @@ func (l *rateLimiter) Allow(key string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
+	for client, window := range l.clients {
+		if now.Sub(window.start) >= l.window {
+			delete(l.clients, client)
+		}
+	}
+
 	window := l.clients[key]
 	if window.start.IsZero() || now.Sub(window.start) >= l.window {
+		if len(l.clients) >= maxRateLimitClients {
+			return false
+		}
 		l.clients[key] = rateWindow{start: now, count: 1}
 		return true
 	}
@@ -694,10 +718,13 @@ func allowedUploadType(name string) (string, error) {
 	if contentType, ok := allowed[ext]; ok {
 		return contentType, nil
 	}
+	if ext == "" {
+		return "", fmt.Errorf("file extension is required")
+	}
 	if detected := mime.TypeByExtension(ext); detected != "" {
 		return "", fmt.Errorf("%s uploads are not allowed", ext)
 	}
-	return "", fmt.Errorf("file extension is required")
+	return "", fmt.Errorf("%s uploads are not allowed", ext)
 }
 
 func humanBytes(n int64) string {
