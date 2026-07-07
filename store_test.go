@@ -77,6 +77,35 @@ func TestStoreRejectsParentCycles(t *testing.T) {
 	}
 }
 
+func TestStoreTaskReturnsAttachmentCopy(t *testing.T) {
+	store, err := NewStore(filepath.Join(t.TempDir(), "state.json"))
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	_, task, err := store.AddTask("With attachment", "", "", []Attachment{{
+		ID:   "file_1",
+		Name: "notes.txt",
+		URL:  "/uploads/file_1_notes.txt",
+	}})
+	if err != nil {
+		t.Fatalf("add task: %v", err)
+	}
+
+	got, err := store.Task(task.ID)
+	if err != nil {
+		t.Fatalf("get task: %v", err)
+	}
+	got.Attachments[0].Name = "mutated.txt"
+
+	again, err := store.Task(task.ID)
+	if err != nil {
+		t.Fatalf("get task again: %v", err)
+	}
+	if again.Attachments[0].Name != "notes.txt" {
+		t.Fatalf("expected stored attachment to be unchanged, got %q", again.Attachments[0].Name)
+	}
+}
+
 func TestStoreSortsTasksWithIDTieBreaker(t *testing.T) {
 	store := &Store{
 		tasks: make(map[string]Task),

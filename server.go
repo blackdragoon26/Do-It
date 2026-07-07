@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"mime"
 	"net"
 	"net/http"
 	"os"
@@ -720,9 +719,6 @@ func allowedUploadType(name string) (string, error) {
 	}
 	if ext == "" {
 		return "", fmt.Errorf("file extension is required")
-	}
-	if detected := mime.TypeByExtension(ext); detected != "" {
-		return "", fmt.Errorf("%s uploads are not allowed", ext)
 	}
 	return "", fmt.Errorf("%s uploads are not allowed", ext)
 }
