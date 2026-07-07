@@ -243,6 +243,7 @@ For the current product, HTTP plus SSE is simpler and easier to debug while lear
 - Uploads are local to one server device.
 - Device presence is approximate because it uses IP plus user agent.
 - No offline edit queue yet.
+- Each mutation currently broadcasts a full task snapshot to every connected browser. That is simple and reliable for a LAN-scale app, but large datasets should move toward diff-based updates or paged sync.
 
 ## Next Architecture Upgrades
 
@@ -252,5 +253,6 @@ Best order:
 2. Pairing code or local auth.
 3. Better backup/export.
 4. Drag-to-reparent graph nodes.
-5. Optional gRPC/Connect-Go API.
-6. mDNS discovery, so devices can open `doit.local`.
+5. Diff-based live sync for large task graphs.
+6. Optional gRPC/Connect-Go API.
+7. mDNS discovery, so devices can open `doit.local`.
