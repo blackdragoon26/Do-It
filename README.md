@@ -49,14 +49,14 @@ Open that address from another device connected to the same Wi-Fi.
 Install the latest release with either `curl` or `wget`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/blackdragoon26/Do-It/dev/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/blackdragoon26/Do-It/main/scripts/install.sh | sh
 ```
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/blackdragoon26/Do-It/dev/scripts/install.sh | sh
+wget -qO- https://raw.githubusercontent.com/blackdragoon26/Do-It/main/scripts/install.sh | sh
 ```
 
-The installer downloads the matching GitHub release archive for Linux or macOS on `amd64`/`arm64`, then installs `doit` into `~/.local/bin`. Override the destination or version when needed:
+The installer downloads the matching GitHub release archive for Linux or macOS on `amd64`/`arm64`, then installs `doit` into `~/.local/bin`. If you cloned the repository or downloaded `scripts/install.sh` locally, override the destination or version when needed:
 
 ```bash
 DOIT_INSTALL_DIR=/usr/local/bin DOIT_VERSION=v1.0.0 sh scripts/install.sh
