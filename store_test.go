@@ -3,6 +3,7 @@ package main
 import (
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestStoreTaskLifecyclePersists(t *testing.T) {
@@ -73,5 +74,22 @@ func TestStoreRejectsParentCycles(t *testing.T) {
 	newParent := child.ID
 	if _, _, err := store.PatchTask(parent.ID, TaskPatch{ParentID: &newParent}); err == nil {
 		t.Fatal("expected cycle to be rejected")
+	}
+}
+
+func TestStoreSortsTasksWithIDTieBreaker(t *testing.T) {
+	store := &Store{
+		tasks: make(map[string]Task),
+	}
+	createdAt := time.Date(2026, 6, 22, 13, 8, 34, 0, time.UTC)
+	store.tasks["task_b"] = Task{ID: "task_b", Title: "Same", CreatedAt: createdAt}
+	store.tasks["task_a"] = Task{ID: "task_a", Title: "Same", CreatedAt: createdAt}
+
+	tasks := store.sortedTasksLocked()
+	if len(tasks) != 2 {
+		t.Fatalf("expected two tasks, got %d", len(tasks))
+	}
+	if tasks[0].ID != "task_a" || tasks[1].ID != "task_b" {
+		t.Fatalf("expected ID tie-breaker order, got %q then %q", tasks[0].ID, tasks[1].ID)
 	}
 }

@@ -311,10 +311,13 @@ func (s *Store) sortedTasksLocked() []Task {
 		tasks = append(tasks, task)
 	}
 	sort.Slice(tasks, func(i, j int) bool {
-		if tasks[i].CreatedAt.Equal(tasks[j].CreatedAt) {
+		if !tasks[i].CreatedAt.Equal(tasks[j].CreatedAt) {
+			return tasks[i].CreatedAt.Before(tasks[j].CreatedAt)
+		}
+		if tasks[i].Title != tasks[j].Title {
 			return tasks[i].Title < tasks[j].Title
 		}
-		return tasks[i].CreatedAt.Before(tasks[j].CreatedAt)
+		return tasks[i].ID < tasks[j].ID
 	})
 	return tasks
 }
