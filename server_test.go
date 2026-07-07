@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCreateTaskWithUpload(t *testing.T) {
@@ -68,6 +69,103 @@ func TestCreateTaskWithUpload(t *testing.T) {
 	}
 	if string(bytes) != "image placeholder" {
 		t.Fatalf("unexpected uploaded file contents: %q", string(bytes))
+	}
+}
+
+func TestCreateTaskRejectsExecutableUploadExtension(t *testing.T) {
+	dataDir := t.TempDir()
+	store, err := NewStore(filepath.Join(dataDir, "state.json"))
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	app := newApp(store, filepath.Join(dataDir, "uploads"), http.NotFoundHandler())
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("title", "Upload a script"); err != nil {
+		t.Fatalf("write title: %v", err)
+	}
+	file, err := writer.CreateFormFile("files", "payload.html")
+	if err != nil {
+		t.Fatalf("create file field: %v", err)
+	}
+	if _, err := file.Write([]byte("<script>alert(1)</script>")); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart writer: %v", err)
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/api/tasks", &body)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	response := httptest.NewRecorder()
+	app.routes().ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", response.Code, response.Body.String())
+	}
+	entries, err := os.ReadDir(filepath.Join(dataDir, "uploads"))
+	if err != nil && !os.IsNotExist(err) {
+		t.Fatalf("read upload dir: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("expected rejected upload to avoid stored files, got %d", len(entries))
+	}
+}
+
+func TestDeleteTaskRemovesUploadedFiles(t *testing.T) {
+	dataDir := t.TempDir()
+	uploadDir := filepath.Join(dataDir, "uploads")
+	store, err := NewStore(filepath.Join(dataDir, "state.json"))
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	app := newApp(store, uploadDir, http.NotFoundHandler())
+	task := createUploadedTask(t, app, "notes.txt", "temporary notes")
+
+	uploadedPath := filepath.Join(uploadDir, strings.TrimPrefix(task.Attachments[0].URL, "/uploads/"))
+	if _, err := os.Stat(uploadedPath); err != nil {
+		t.Fatalf("expected uploaded file before delete: %v", err)
+	}
+
+	request := httptest.NewRequest(http.MethodDelete, "/api/tasks/"+task.ID, nil)
+	response := httptest.NewRecorder()
+	app.routes().ServeHTTP(response, request)
+
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", response.Code, response.Body.String())
+	}
+	if _, err := os.Stat(uploadedPath); !os.IsNotExist(err) {
+		t.Fatalf("expected uploaded file to be removed, got %v", err)
+	}
+}
+
+func TestMutationRateLimit(t *testing.T) {
+	dataDir := t.TempDir()
+	store, err := NewStore(filepath.Join(dataDir, "state.json"))
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	app := newApp(store, filepath.Join(dataDir, "uploads"), http.NotFoundHandler())
+	app.limiter = newRateLimiter(time.Minute, 1)
+
+	for i, want := range []int{http.StatusCreated, http.StatusTooManyRequests} {
+		var body bytes.Buffer
+		writer := multipart.NewWriter(&body)
+		if err := writer.WriteField("title", "Limited task"); err != nil {
+			t.Fatalf("write title: %v", err)
+		}
+		if err := writer.Close(); err != nil {
+			t.Fatalf("close multipart writer: %v", err)
+		}
+		request := httptest.NewRequest(http.MethodPost, "/api/tasks", &body)
+		request.RemoteAddr = "203.0.113.10:4000"
+		request.Header.Set("Content-Type", writer.FormDataContentType())
+		response := httptest.NewRecorder()
+		app.routes().ServeHTTP(response, request)
+		if response.Code != want {
+			t.Fatalf("request %d: expected status %d, got %d: %s", i+1, want, response.Code, response.Body.String())
+		}
 	}
 }
 
@@ -167,4 +265,41 @@ func TestEventHubTracksClientHealth(t *testing.T) {
 	if health.RTTMs == nil || *health.RTTMs != 40 {
 		t.Fatalf("expected rtt, got %+v", health)
 	}
+}
+
+func createUploadedTask(t *testing.T, app *app, name, contents string) Task {
+	t.Helper()
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("title", "Upload a file"); err != nil {
+		t.Fatalf("write title: %v", err)
+	}
+	file, err := writer.CreateFormFile("files", name)
+	if err != nil {
+		t.Fatalf("create file field: %v", err)
+	}
+	if _, err := file.Write([]byte(contents)); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart writer: %v", err)
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/api/tasks", &body)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	response := httptest.NewRecorder()
+	app.routes().ServeHTTP(response, request)
+
+	if response.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d: %s", response.Code, response.Body.String())
+	}
+	var task Task
+	if err := json.Unmarshal(response.Body.Bytes(), &task); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(task.Attachments) != 1 {
+		t.Fatalf("expected one attachment, got %d", len(task.Attachments))
+	}
+	return task
 }
