@@ -26,7 +26,7 @@ else
 fi
 
 archive="Do-It_${os}_${arch}.${archive_ext}"
-tmp_dir="$(mktemp -d)"
+tmp_dir="$(mktemp -d 2>/dev/null || mktemp -d "${TMPDIR:-/tmp}/doit.XXXXXX")"
 trap 'rm -rf "$tmp_dir"' EXIT INT TERM
 
 download() {
