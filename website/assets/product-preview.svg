@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="720" viewBox="0 0 980 720" role="img" aria-labelledby="title desc">
+  <title id="title">Do-It dark interface preview</title>
+  <desc id="desc">A minimal dark task graph interface with a rail, connected nodes, and details panel.</desc>
+  <rect width="980" height="720" fill="#030303"/>
+  <rect x="44" y="42" width="892" height="636" rx="18" fill="#070707" stroke="#ffffff" stroke-opacity=".16"/>
+  <rect x="44" y="42" width="214" height="636" rx="18" fill="#ffffff" fill-opacity=".045" stroke="#ffffff" stroke-opacity=".12"/>
+  <rect x="722" y="42" width="214" height="636" rx="18" fill="#ffffff" fill-opacity=".045" stroke="#ffffff" stroke-opacity=".12"/>
+  <text x="76" y="100" fill="#f5f5f5" font-family="Arial, sans-serif" font-size="32" font-weight="650">Do-It</text>
+  <text x="76" y="154" fill="#f5f5f5" fill-opacity=".56" font-family="Arial, sans-serif" font-size="13">TASK</text>
+  <rect x="76" y="174" width="142" height="38" rx="6" fill="#ffffff" fill-opacity=".08" stroke="#ffffff" stroke-opacity=".14"/>
+  <text x="76" y="262" fill="#f5f5f5" fill-opacity=".56" font-family="Arial, sans-serif" font-size="13">LAN</text>
+  <line x1="76" y1="286" x2="218" y2="286" stroke="#ffffff" stroke-opacity=".13"/>
+  <text x="76" y="315" fill="#f5f5f5" fill-opacity=".82" font-family="Arial, sans-serif" font-size="16">192.168.1.22</text>
+  <text x="754" y="100" fill="#f5f5f5" fill-opacity=".56" font-family="Arial, sans-serif" font-size="13">DETAILS</text>
+  <text x="754" y="146" fill="#f5f5f5" font-family="Arial, sans-serif" font-size="27" font-weight="650">Build site</text>
+  <line x1="754" y1="190" x2="888" y2="190" stroke="#ffffff" stroke-opacity=".13"/>
+  <line x1="754" y1="226" x2="860" y2="226" stroke="#ffffff" stroke-opacity=".13"/>
+  <line x1="754" y1="262" x2="898" y2="262" stroke="#ffffff" stroke-opacity=".13"/>
+  <g fill="none" stroke="#f5f5f5" stroke-opacity=".22" stroke-width="2">
+    <path d="M396 386L490 284L598 368"/>
+    <path d="M490 284L610 236"/>
+  </g>
+  <g font-family="Arial, sans-serif" font-size="18" font-weight="650">
+    <circle cx="396" cy="386" r="58" fill="#030303" stroke="#f5f5f5" stroke-opacity=".5" stroke-width="2"/>
+    <text x="371" y="393" fill="#f5f5f5">Plan</text>
+    <circle cx="490" cy="284" r="68" fill="#f5f5f5"/>
+    <text x="459" y="291" fill="#030303">Build</text>
+    <circle cx="598" cy="368" r="56" fill="#030303" stroke="#f5f5f5" stroke-opacity=".3" stroke-width="2"/>
+    <text x="570" y="375" fill="#f5f5f5">Notes</text>
+    <circle cx="610" cy="236" r="44" fill="#030303" stroke="#f5f5f5" stroke-opacity=".24" stroke-width="2"/>
+    <text x="590" y="243" fill="#f5f5f5">Ship</text>
+  </g>
+</svg>

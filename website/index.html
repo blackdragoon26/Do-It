@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Do-It is a local-first task graph that runs on your own machine.">
+    <title>Do-It | Local-first task graph</title>
+    <link rel="stylesheet" href="./styles.css?v=4">
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="Do-It home">Do-It</a>
+      <nav aria-label="Primary navigation">
+        <a href="#install">Install</a>
+        <a href="https://github.com/blackdragoon26/Do-It" rel="noopener noreferrer">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow">Local-first task graph</p>
+          <h1 id="hero-title">Do-It</h1>
+          <p class="lede">Tasks, notes, files, and nearby devices. Served from your own machine, synced across your own network.</p>
+          <div class="hero-actions" aria-label="Primary actions">
+            <a class="button primary" href="#install">Install</a>
+            <a class="button" href="https://github.com/blackdragoon26/Do-It" rel="noopener noreferrer">Source</a>
+          </div>
+          <p class="release-note">Latest release <a id="release-link" href="https://github.com/blackdragoon26/Do-It/releases/latest" rel="noopener noreferrer">checking GitHub</a></p>
+        </div>
+
+        <figure class="product-frame">
+          <img src="./assets/product-preview.svg" alt="Minimal Do-It task graph interface preview">
+        </figure>
+      </section>
+
+      <section class="facts" aria-label="Product details">
+        <p><span>Runtime</span> Single Go binary</p>
+        <p><span>Sync</span> Live browser updates</p>
+        <p><span>Storage</span> Local JSON and uploads</p>
+      </section>
+
+      <section id="install" class="install-section" aria-labelledby="install-title">
+        <div>
+          <p class="eyebrow">Install</p>
+          <h2 id="install-title">Run it anywhere you keep online.</h2>
+        </div>
+        <div class="commands">
+          <pre><code>curl -fsSL https://raw.githubusercontent.com/blackdragoon26/Do-It/main/scripts/install.sh | sh</code></pre>
+          <pre><code>DOIT_ADDR=0.0.0.0:8080 doit</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>Created by blackdragoon26</span>
+      <a href="https://github.com/blackdragoon26/Do-It" rel="noopener noreferrer">github.com/blackdragoon26/Do-It</a>
+    </footer>
+    <script>
+      const releaseLink = document.querySelector("#release-link");
+
+      fetch("https://api.github.com/repos/blackdragoon26/Do-It/releases/latest", {
+        headers: { accept: "application/vnd.github+json" }
+      })
+        .then((response) => {
+          if (!response.ok) throw new Error("release unavailable");
+          return response.json();
+        })
+        .then((release) => {
+          releaseLink.textContent = release.tag_name || "latest";
+          releaseLink.href = release.html_url || releaseLink.href;
+        })
+        .catch(() => {
+          releaseLink.textContent = "latest on GitHub";
+        });
+    </script>
+  </body>
+</html>
