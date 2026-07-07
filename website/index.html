@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Do-It | Local-first task graph</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#top">Do-It</a>
+      <nav aria-label="Primary">
+        <a href="#features">Features</a>
+        <a href="#install">Install</a>
+        <a href="https://github.com/blackdragoon26/Do-It">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <img src="https://github.com/user-attachments/assets/be59e0f7-30ea-49b8-892f-37f157ca7ee3" alt="Do-It task graph running in a browser">
+        <div class="hero-copy">
+          <p class="eyebrow">Local-first task graph</p>
+          <h1>Do-It</h1>
+          <p class="lede">A quiet Go server for tasks, notes, files, and images that stay synced across your own Wi-Fi devices.</p>
+          <div class="hero-actions">
+            <a class="primary" href="#install">Install</a>
+            <a href="https://github.com/blackdragoon26/Do-It">View source</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="summary" aria-label="Product summary">
+        <div>
+          <span>Runtime</span>
+          <strong>Single Go binary</strong>
+        </div>
+        <div>
+          <span>Sync</span>
+          <strong>Server-Sent Events</strong>
+        </div>
+        <div>
+          <span>Storage</span>
+          <strong>Local JSON and uploads</strong>
+        </div>
+      </section>
+
+      <section id="features" class="section">
+        <div class="section-heading">
+          <p class="eyebrow">Why it exists</p>
+          <h2>A personal task map for homelab devices</h2>
+        </div>
+        <div class="feature-grid">
+          <article>
+            <h3>Graph-shaped work</h3>
+            <p>Tasks can point to parent tasks, so plans become connected nodes instead of a flat list.</p>
+          </article>
+          <article>
+            <h3>LAN sync</h3>
+            <p>Open the same server from a laptop, phone, or tablet and receive live updates in every browser.</p>
+          </article>
+          <article>
+            <h3>Files stay home</h3>
+            <p>Attachments are saved on the host device under the app data directory, not pushed to a cloud account.</p>
+          </article>
+          <article>
+            <h3>Device awareness</h3>
+            <p>Connected browser sessions report useful status like battery, network type, and online state when available.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="install" class="section install-section">
+        <div class="section-heading">
+          <p class="eyebrow">Terminal download</p>
+          <h2>Install from GitHub releases</h2>
+        </div>
+        <div class="install-grid">
+          <div>
+            <p>Use the latest release on Linux or macOS:</p>
+            <pre><code>curl -fsSL https://raw.githubusercontent.com/blackdragoon26/Do-It/main/scripts/install.sh | sh</code></pre>
+            <pre><code>wget -qO- https://raw.githubusercontent.com/blackdragoon26/Do-It/main/scripts/install.sh | sh</code></pre>
+          </div>
+          <div>
+            <p>Run it on your LAN:</p>
+            <pre><code>DOIT_ADDR=0.0.0.0:8080 doit</code></pre>
+            <p class="muted">Then open the printed LAN URL from another device on the same Wi-Fi.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section split">
+        <div>
+          <p class="eyebrow">Good host devices</p>
+          <h2>Built for machines you already have</h2>
+        </div>
+        <ul>
+          <li>Old Android phone running Termux</li>
+          <li>Raspberry Pi</li>
+          <li>Mini PC</li>
+          <li>NAS or small Linux box</li>
+        </ul>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>Created by blackdragoon26</span>
+      <a href="https://github.com/blackdragoon26/Do-It">GitHub</a>
+    </footer>
+  </body>
+</html>
