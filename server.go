@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -25,6 +27,8 @@ const (
 	maxFilesPerTask       = 8
 	maxMutationsPerMinute = 60
 	maxRateLimitClients   = 4096
+	csrfCookieName        = "doit_csrf"
+	csrfHeaderName        = "X-CSRF-Token"
 )
 
 type app struct {
@@ -128,7 +132,7 @@ func (a *app) routes() http.Handler {
 	mux.HandleFunc("/api/network", a.handleNetwork)
 	mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(a.uploadDir))))
 	mux.Handle("/", a.static)
-	return withSecurityHeaders(a.withMutationRateLimit(mux))
+	return withSecurityHeaders(withCSRFCookie(withCSRFProtection(a.withMutationRateLimit(mux))))
 }
 
 func (a *app) handleTasks(w http.ResponseWriter, r *http.Request) {
@@ -631,6 +635,16 @@ func (a *app) withMutationRateLimit(next http.Handler) http.Handler {
 	})
 }
 
+func withCSRFProtection(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if requiresCSRF(r) && !validCSRFToken(r) {
+			httpError(w, http.StatusForbidden, "invalid CSRF token")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func isMutation(r *http.Request) bool {
 	switch r.Method {
 	case http.MethodPost, http.MethodPatch, http.MethodDelete, http.MethodPut:
@@ -638,6 +652,87 @@ func isMutation(r *http.Request) bool {
 	default:
 		return false
 	}
+}
+
+func withCSRFCookie(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if isSafeMethod(r.Method) {
+			ensureCSRFCookie(w, r)
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func requiresCSRF(r *http.Request) bool {
+	switch r.Method {
+	case http.MethodPost, http.MethodPatch, http.MethodDelete:
+		return strings.HasPrefix(r.URL.Path, "/api/")
+	default:
+		return false
+	}
+}
+
+func isSafeMethod(method string) bool {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+		return true
+	default:
+		return false
+	}
+}
+
+func ensureCSRFCookie(w http.ResponseWriter, r *http.Request) {
+	if cookie, err := r.Cookie(csrfCookieName); err == nil && strings.TrimSpace(cookie.Value) != "" {
+		return
+	}
+	token, err := newCSRFToken()
+	if err != nil {
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     csrfCookieName,
+		Value:    token,
+		Path:     "/",
+		SameSite: http.SameSiteStrictMode,
+		Secure:   requestIsHTTPS(r),
+	})
+}
+
+func requestIsHTTPS(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	if strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
+		return true
+	}
+	for _, part := range strings.Split(r.Header.Get("Forwarded"), ";") {
+		part = strings.TrimSpace(part)
+		if strings.EqualFold(part, "proto=https") {
+			return true
+		}
+	}
+	return false
+}
+
+func validCSRFToken(r *http.Request) bool {
+	cookie, err := r.Cookie(csrfCookieName)
+	if err != nil {
+		return false
+	}
+	cookieToken := strings.TrimSpace(cookie.Value)
+	headerToken := strings.TrimSpace(r.Header.Get(csrfHeaderName))
+	if cookieToken == "" || headerToken == "" || len(cookieToken) != len(headerToken) {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(cookieToken), []byte(headerToken)) == 1
+}
+
+func newCSRFToken() (string, error) {
+	var bytes [32]byte
+	if _, err := rand.Read(bytes[:]); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes[:]), nil
 }
 
 func withSecurityHeaders(next http.Handler) http.Handler {
