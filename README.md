@@ -44,6 +44,33 @@ http://192.168.1.22:8080
 
 Open that address from another device connected to the same Wi-Fi.
 
+## Terminal Download
+
+Install the latest release with either `curl` or `wget`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/blackdragoon26/Do-It/main/scripts/install.sh | sh
+```
+
+```bash
+wget -qO- https://raw.githubusercontent.com/blackdragoon26/Do-It/main/scripts/install.sh | sh
+```
+
+The installer downloads the matching GitHub release archive for Linux or macOS on `amd64`/`arm64`, then installs `doit` into `~/.local/bin`. If you cloned the repository or downloaded `scripts/install.sh` locally, override the destination or version when needed:
+
+```bash
+DOIT_INSTALL_DIR=/usr/local/bin DOIT_VERSION=v1.0.0 sh scripts/install.sh
+```
+
+Manual download format:
+
+```text
+https://github.com/blackdragoon26/Do-It/releases/latest/download/Do-It_linux_amd64.tar.gz
+https://github.com/blackdragoon26/Do-It/releases/latest/download/Do-It_linux_arm64.tar.gz
+https://github.com/blackdragoon26/Do-It/releases/latest/download/Do-It_darwin_amd64.tar.gz
+https://github.com/blackdragoon26/Do-It/releases/latest/download/Do-It_darwin_arm64.tar.gz
+```
+
 ## Data Storage
 
 By default, Do-It writes local app data under:
