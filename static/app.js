@@ -27,6 +27,7 @@ form.addEventListener("submit", async (event) => {
 
   const response = await fetch("/api/tasks", {
     method: "POST",
+    headers: csrfHeaders(),
     body: data,
   });
   if (!response.ok) {
@@ -490,7 +491,7 @@ function compareTasks(a, b) {
 async function patchTask(id, payload) {
   const response = await fetch(`/api/tasks/${id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...csrfHeaders() },
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
@@ -501,6 +502,7 @@ async function patchTask(id, payload) {
 async function deleteTask(id) {
   const response = await fetch(`/api/tasks/${id}`, {
     method: "DELETE",
+    headers: csrfHeaders(),
   });
   if (!response.ok) {
     await showRequestError(response);
@@ -518,6 +520,20 @@ function getClientId() {
     : `client-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   window.localStorage.setItem(key, id);
   return id;
+}
+
+function csrfHeaders() {
+  const token = readCookie("doit_csrf");
+  return token ? { "X-CSRF-Token": token } : {};
+}
+
+function readCookie(name) {
+  const prefix = `${name}=`;
+  return document.cookie
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(prefix))
+    ?.slice(prefix.length) || "";
 }
 
 async function startClientStatusReporting() {
@@ -547,7 +563,7 @@ async function reportClientStatus() {
   try {
     await fetch("/api/client-status", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify(status),
       keepalive: true,
     });

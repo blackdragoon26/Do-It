@@ -40,6 +40,7 @@ func TestCreateTaskWithUpload(t *testing.T) {
 	}
 
 	request := httptest.NewRequest(http.MethodPost, "/api/tasks", &body)
+	addCSRF(request)
 	request.Header.Set("Content-Type", writer.FormDataContentType())
 	response := httptest.NewRecorder()
 	app.routes().ServeHTTP(response, request)
@@ -98,6 +99,7 @@ func TestCreateTaskRejectsExecutableUploadExtension(t *testing.T) {
 	}
 
 	request := httptest.NewRequest(http.MethodPost, "/api/tasks", &body)
+	addCSRF(request)
 	request.Header.Set("Content-Type", writer.FormDataContentType())
 	response := httptest.NewRecorder()
 	app.routes().ServeHTTP(response, request)
@@ -111,6 +113,93 @@ func TestCreateTaskRejectsExecutableUploadExtension(t *testing.T) {
 	}
 	if len(entries) != 0 {
 		t.Fatalf("expected rejected upload to avoid stored files, got %d", len(entries))
+	}
+}
+
+func TestCreateTaskRejectsMissingCSRFToken(t *testing.T) {
+	dataDir := t.TempDir()
+	store, err := NewStore(filepath.Join(dataDir, "state.json"))
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	app := newApp(store, filepath.Join(dataDir, "uploads"), http.NotFoundHandler())
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("title", "Missing token"); err != nil {
+		t.Fatalf("write title: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart writer: %v", err)
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/api/tasks", &body)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	response := httptest.NewRecorder()
+	app.routes().ServeHTTP(response, request)
+
+	if response.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d: %s", response.Code, response.Body.String())
+	}
+}
+
+func TestUnsupportedAPIMethodReturnsMethodNotAllowedWithoutCSRF(t *testing.T) {
+	dataDir := t.TempDir()
+	store, err := NewStore(filepath.Join(dataDir, "state.json"))
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	app := newApp(store, filepath.Join(dataDir, "uploads"), http.NotFoundHandler())
+
+	request := httptest.NewRequest(http.MethodPut, "/api/tasks", nil)
+	response := httptest.NewRecorder()
+	app.routes().ServeHTTP(response, request)
+
+	if response.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected status 405, got %d: %s", response.Code, response.Body.String())
+	}
+}
+
+func TestCSRFCookieIsOnlyIssuedForSafeMethods(t *testing.T) {
+	store, err := NewStore(filepath.Join(t.TempDir(), "state.json"))
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	app := newApp(store, t.TempDir(), http.NotFoundHandler())
+
+	postRequest := httptest.NewRequest(http.MethodPost, "/", nil)
+	postResponse := httptest.NewRecorder()
+	app.routes().ServeHTTP(postResponse, postRequest)
+	if cookieByName(postResponse.Result().Cookies(), csrfCookieName) != nil {
+		t.Fatal("expected unsafe non-API request not to receive a CSRF cookie")
+	}
+
+	getRequest := httptest.NewRequest(http.MethodGet, "/api/tasks", nil)
+	getResponse := httptest.NewRecorder()
+	app.routes().ServeHTTP(getResponse, getRequest)
+	if cookieByName(getResponse.Result().Cookies(), csrfCookieName) == nil {
+		t.Fatal("expected safe request to receive a CSRF cookie")
+	}
+}
+
+func TestCSRFCookieUsesForwardedHTTPSForSecureAttribute(t *testing.T) {
+	store, err := NewStore(filepath.Join(t.TempDir(), "state.json"))
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	app := newApp(store, t.TempDir(), http.NotFoundHandler())
+
+	request := httptest.NewRequest(http.MethodGet, "/api/tasks", nil)
+	request.Header.Set("X-Forwarded-Proto", "https")
+	response := httptest.NewRecorder()
+	app.routes().ServeHTTP(response, request)
+
+	cookie := cookieByName(response.Result().Cookies(), csrfCookieName)
+	if cookie == nil {
+		t.Fatal("expected CSRF cookie")
+	}
+	if !cookie.Secure {
+		t.Fatal("expected forwarded HTTPS request to set Secure cookie")
 	}
 }
 
@@ -147,6 +236,7 @@ func TestCreateTaskCleansEarlierUploadsWhenLaterFileFails(t *testing.T) {
 	}
 
 	request := httptest.NewRequest(http.MethodPost, "/api/tasks", &body)
+	addCSRF(request)
 	request.Header.Set("Content-Type", writer.FormDataContentType())
 	response := httptest.NewRecorder()
 	app.routes().ServeHTTP(response, request)
@@ -189,6 +279,7 @@ func TestDeleteTaskRemovesUploadedFiles(t *testing.T) {
 	}
 
 	request := httptest.NewRequest(http.MethodDelete, "/api/tasks/"+task.ID, nil)
+	addCSRF(request)
 	response := httptest.NewRecorder()
 	app.routes().ServeHTTP(response, request)
 
@@ -219,6 +310,7 @@ func TestMutationRateLimit(t *testing.T) {
 			t.Fatalf("close multipart writer: %v", err)
 		}
 		request := httptest.NewRequest(http.MethodPost, "/api/tasks", &body)
+		addCSRF(request)
 		request.RemoteAddr = "203.0.113.10:4000"
 		request.Header.Set("Content-Type", writer.FormDataContentType())
 		response := httptest.NewRecorder()
@@ -374,6 +466,7 @@ func createUploadedTask(t *testing.T, app *app, name, contents string) Task {
 	}
 
 	request := httptest.NewRequest(http.MethodPost, "/api/tasks", &body)
+	addCSRF(request)
 	request.Header.Set("Content-Type", writer.FormDataContentType())
 	response := httptest.NewRecorder()
 	app.routes().ServeHTTP(response, request)
@@ -389,4 +482,19 @@ func createUploadedTask(t *testing.T, app *app, name, contents string) Task {
 		t.Fatalf("expected one attachment, got %d", len(task.Attachments))
 	}
 	return task
+}
+
+func addCSRF(request *http.Request) {
+	const token = "test-csrf-token"
+	request.AddCookie(&http.Cookie{Name: csrfCookieName, Value: token})
+	request.Header.Set(csrfHeaderName, token)
+}
+
+func cookieByName(cookies []*http.Cookie, name string) *http.Cookie {
+	for _, cookie := range cookies {
+		if cookie.Name == name {
+			return cookie
+		}
+	}
+	return nil
 }
