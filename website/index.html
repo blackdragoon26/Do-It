@@ -26,7 +26,7 @@
             <a class="button primary" href="#install">Install</a>
             <a class="button" href="https://github.com/blackdragoon26/Do-It" rel="noopener noreferrer">Source</a>
           </div>
-          <p class="release-note">Latest release <a id="release-link" href="https://github.com/blackdragoon26/Do-It/releases/latest" rel="noopener noreferrer">latest on GitHub</a></p>
+          <p class="release-note">Latest release <a href="https://github.com/blackdragoon26/Do-It/releases/tag/v1.0.0" rel="noopener noreferrer">v1.0.0</a></p>
         </div>
 
         <figure class="product-frame">
@@ -64,37 +64,33 @@
       <a href="https://github.com/blackdragoon26/Do-It" rel="noopener noreferrer">github.com/blackdragoon26/Do-It</a>
     </footer>
     <script>
-      const releaseLink = document.querySelector("#release-link");
-
-      fetch("https://api.github.com/repos/blackdragoon26/Do-It/releases/latest", {
-        headers: { accept: "application/vnd.github+json" }
-      })
-        .then((response) => {
-          if (!response.ok) throw new Error("release unavailable");
-          return response.json();
-        })
-        .then((release) => {
-          releaseLink.textContent = release.tag_name || "latest";
-          releaseLink.href = release.html_url || releaseLink.href;
-        })
-        .catch(() => {
-          releaseLink.textContent = "latest on GitHub";
-        });
-
       document.querySelectorAll("[data-copy]").forEach((button) => {
+        const originalLabel = button.textContent;
+        let revertTimer;
+
+        const restoreLabel = () => {
+          clearTimeout(revertTimer);
+          revertTimer = window.setTimeout(() => {
+            button.textContent = originalLabel;
+          }, 1400);
+        };
+
         button.addEventListener("click", async () => {
-          const label = button.textContent;
+          clearTimeout(revertTimer);
           try {
             await navigator.clipboard.writeText(button.dataset.copy);
             button.textContent = "copied";
-            window.setTimeout(() => {
-              button.textContent = label;
-            }, 1400);
+            restoreLabel();
           } catch {
+            const code = button.closest(".command")?.querySelector("code");
+            if (code) {
+              const range = document.createRange();
+              range.selectNodeContents(code);
+              window.getSelection()?.removeAllRanges();
+              window.getSelection()?.addRange(range);
+            }
             button.textContent = "select";
-            window.setTimeout(() => {
-              button.textContent = label;
-            }, 1400);
+            restoreLabel();
           }
         });
       });

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf16"
 )
 
 var (
@@ -178,15 +179,15 @@ func (s *Store) PatchTask(id string, patch TaskPatch) (Snapshot, Task, error) {
 		if title == "" {
 			return Snapshot{}, Task{}, fmt.Errorf("%w: title is required", errBadInput)
 		}
-		if tooLong(title, maxTitleLength) {
-			return Snapshot{}, Task{}, fmt.Errorf("%w: title must be at most %d characters", errBadInput, maxTitleLength)
+		if err := validateTaskText(title, task.Notes); err != nil {
+			return Snapshot{}, Task{}, err
 		}
 		task.Title = title
 	}
 	if patch.Notes != nil {
 		notes := strings.TrimSpace(*patch.Notes)
-		if tooLong(notes, maxNotesLength) {
-			return Snapshot{}, Task{}, fmt.Errorf("%w: notes must be at most %d characters", errBadInput, maxNotesLength)
+		if err := validateTaskText(task.Title, notes); err != nil {
+			return Snapshot{}, Task{}, err
 		}
 		task.Notes = notes
 	}
@@ -383,11 +384,7 @@ func validateTaskText(title, notes string) error {
 func tooLong(value string, max int) bool {
 	units := 0
 	for _, r := range value {
-		if r > 0xFFFF {
-			units += 2
-		} else {
-			units++
-		}
+		units += utf16.RuneLen(r)
 		if units > max {
 			return true
 		}

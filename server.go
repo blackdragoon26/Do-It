@@ -27,6 +27,7 @@ const (
 	maxFilesPerTask       = 8
 	maxMutationsPerMinute = 60
 	maxRateLimitClients   = 4096
+	rateLimitPruneEvery   = 15 * time.Second
 	csrfCookieName        = "doit_csrf"
 	csrfHeaderName        = "X-CSRF-Token"
 )
@@ -63,10 +64,11 @@ type serverEvent struct {
 }
 
 type rateLimiter struct {
-	mu      sync.Mutex
-	window  time.Duration
-	limit   int
-	clients map[string]rateWindow
+	mu        sync.Mutex
+	window    time.Duration
+	limit     int
+	lastPrune time.Time
+	clients   map[string]rateWindow
 }
 
 type rateWindow struct {
@@ -665,7 +667,7 @@ func withCSRFCookie(next http.Handler) http.Handler {
 
 func requiresCSRF(r *http.Request) bool {
 	switch r.Method {
-	case http.MethodPost, http.MethodPatch, http.MethodDelete:
+	case http.MethodPost, http.MethodPatch, http.MethodDelete, http.MethodPut:
 		return strings.HasPrefix(r.URL.Path, "/api/")
 	default:
 		return false
@@ -752,11 +754,7 @@ func (l *rateLimiter) Allow(key string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	for client, window := range l.clients {
-		if now.Sub(window.start) >= l.window {
-			delete(l.clients, client)
-		}
-	}
+	l.pruneExpiredLocked(now)
 
 	window := l.clients[key]
 	if window.start.IsZero() || now.Sub(window.start) >= l.window {
@@ -772,6 +770,18 @@ func (l *rateLimiter) Allow(key string) bool {
 	window.count++
 	l.clients[key] = window
 	return true
+}
+
+func (l *rateLimiter) pruneExpiredLocked(now time.Time) {
+	if !l.lastPrune.IsZero() && now.Sub(l.lastPrune) < rateLimitPruneEvery {
+		return
+	}
+	l.lastPrune = now
+	for client, window := range l.clients {
+		if now.Sub(window.start) >= l.window {
+			delete(l.clients, client)
+		}
+	}
 }
 
 func sanitizeFilename(name string) string {
