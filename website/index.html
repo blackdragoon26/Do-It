@@ -26,7 +26,7 @@
             <a class="button primary" href="#install">Install</a>
             <a class="button" href="https://github.com/blackdragoon26/Do-It" rel="noopener noreferrer">Source</a>
           </div>
-          <p class="release-note">Latest release <a href="https://github.com/blackdragoon26/Do-It/releases/tag/v1.1.0" rel="noopener noreferrer">v1.1.0</a></p>
+          <p class="release-note">Latest release <a id="latest-release" href="https://github.com/blackdragoon26/Do-It/releases/tag/v1.1.0" rel="noopener noreferrer">v1.1.0</a></p>
         </div>
 
         <figure class="product-frame">
@@ -64,6 +64,24 @@
       <a href="https://github.com/blackdragoon26/Do-It" rel="noopener noreferrer">github.com/blackdragoon26/Do-It</a>
     </footer>
     <script>
+      const releaseLink = document.getElementById("latest-release");
+      if (releaseLink) {
+        fetch("/api/release", { headers: { Accept: "application/json" } })
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error("release lookup failed");
+            }
+            return response.json();
+          })
+          .then((release) => {
+            if (release.tagName && release.url) {
+              releaseLink.textContent = release.tagName;
+              releaseLink.href = release.url;
+            }
+          })
+          .catch(() => {});
+      }
+
       document.querySelectorAll("[data-copy]").forEach((button) => {
         const originalLabel = button.textContent;
         let revertTimer;
