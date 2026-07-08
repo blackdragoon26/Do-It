@@ -1,8 +1,8 @@
 const https = require("https");
 
 const fallbackRelease = {
-  tagName: "v1.1.0",
-  url: "https://github.com/blackdragoon26/Do-It/releases/tag/v1.1.0",
+  tagName: "latest",
+  url: "https://github.com/blackdragoon26/Do-It/releases/latest",
 };
 
 function fetchLatestRelease() {
@@ -60,11 +60,11 @@ module.exports = async function handler(request, response) {
       url: release.html_url || fallbackRelease.url,
     };
 
-    response.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=86400");
+    response.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=300");
     response.setHeader("Content-Type", "application/json; charset=utf-8");
     response.end(JSON.stringify(payload));
   } catch {
-    response.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=3600");
+    response.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate=60");
     response.setHeader("Content-Type", "application/json; charset=utf-8");
     response.end(JSON.stringify(fallbackRelease));
   }
