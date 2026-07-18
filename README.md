@@ -17,6 +17,10 @@ The product goal is simple: tasks, notes, files, and images stay synced across l
 - JSON persistence for tasks and attachment metadata.
 - Unit tests for task storage, uploads, and device presence.
 
+## System Architecture
+<img width="814" height="1123" alt="image" src="https://github.com/user-attachments/assets/31046be3-1820-4a92-aaf9-a5bd78d8c54e" />
+
+
 ## Quick Start
 
 ```bash
